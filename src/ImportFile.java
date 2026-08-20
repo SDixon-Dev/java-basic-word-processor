@@ -1,118 +1,106 @@
-// imports java library elements used by the class
+/**
+ * Handles loading RTF files into the word processor.
+ *
+ * Opens a file chooser, reads the selected RTF file into a new
+ * StyledDocument, and displays the loaded document in the JTextPane.
+ *
+ * @author seand
+ */
+
 import java.io.BufferedInputStream;
-import java.io.FileInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
-import javax.swing.JTextPane;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.JTextPane;
 import javax.swing.filechooser.FileNameExtensionFilter;
-
 import javax.swing.text.BadLocationException;
 import javax.swing.text.StyledDocument;
 import javax.swing.text.rtf.RTFEditorKit;
 
-
 public class ImportFile {
 
+    /**
+     * Opens an RTF file and loads its contents into the text editor.
+     *
+     * @param text the JTextPane that will display the loaded document
+     * @return the successfully loaded file, or null if loading is cancelled
+     *         or fails
+     */
     public File open(JTextPane text) {
 
         JFileChooser fileChooser = new JFileChooser();
-
-        // Allows the selection of only one file
         fileChooser.setMultiSelectionEnabled(false);
 
-        // Filters the file chooser so RTF files are displayed
+        // Restricts the file chooser to RTF files.
         FileNameExtensionFilter fileFilter =
                 new FileNameExtensionFilter(
-                        "RICH TEXT FORMAT",
+                        "Rich Text Format (*.rtf)",
                         "rtf"
                 );
 
         fileChooser.setFileFilter(fileFilter);
 
-        // Displays the Open dialog box
+        // Displays the Open dialog.
         int option = fileChooser.showOpenDialog(null);
 
-        
-        // Attempts to access the selected file if user clicks Open.
-        
-        if (option == JFileChooser.APPROVE_OPTION) {
-
-            File selectedFile = fileChooser.getSelectedFile();
-
-            RTFEditorKit editorKit = new RTFEditorKit();
-
-            /*
-             * Creates a new empty document.
-             * The loaded file will be read into this
-             * rather than being inserted into the
-             * document already displayed.
-             */
-            StyledDocument document =
-                    (StyledDocument) editorKit.createDefaultDocument();
-
-           
-            //Creates input stream to load the selected file.
-           
-            try (
-                BufferedInputStream in =
-                        new BufferedInputStream(
-                                new FileInputStream(selectedFile)
-                        )
-            ) {
-
-                // Reads the selected RTF file from the beginning
-                editorKit.read(in, document, 0);
-
-                // Displays the loaded document in the JTextPane
-                text.setDocument(document);
-
-                JOptionPane.showMessageDialog(
-                        null,
-                        "File loaded successfully.",
-                        "Load Successful",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
-                
-                //returns file successfully loaded
-                return selectedFile;
-
-            } catch (IOException e) {
-
-                JOptionPane.showMessageDialog(
-                        null,
-                        "The file could not be loaded.",
-                        "Load Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
-                
-                return null;
-           
-            } catch (BadLocationException e) {
-
-                JOptionPane.showMessageDialog(
-                        null,
-                        "The file contents could not be displayed.",
-                        "Load Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
-                
-                return null;
-            }
-
-        } else {
+        if (option != JFileChooser.APPROVE_OPTION) {
 
             JOptionPane.showMessageDialog(
                     null,
-                    "Text open cancelled.",
-                    "Load Cancelled",
+                    "File opening cancelled.",
+                    "Open Cancelled",
                     JOptionPane.INFORMATION_MESSAGE
             );
-            
+
+            return null;
+        }
+
+        File selectedFile = fileChooser.getSelectedFile();
+
+        RTFEditorKit editorKit = new RTFEditorKit();
+
+        // Creates new document so the loaded file replaces current contents.
+        StyledDocument document =
+                (StyledDocument) editorKit.createDefaultDocument();
+
+        /*
+         * Opens the selected file, reads RTF contents into the
+         * new document, auto closes the input stream.
+         */
+        try (
+            BufferedInputStream in =
+                    new BufferedInputStream(
+                            new FileInputStream(selectedFile)
+                    )
+        ) {
+
+            editorKit.read(in, document, 0);
+
+            // Displays the loaded document in the editor.
+            text.setDocument(document);
+
+            JOptionPane.showMessageDialog(
+                    null,
+                    "File loaded successfully.",
+                    "Load Successful",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return selectedFile;
+
+        } catch (IOException | BadLocationException e) {
+
+            JOptionPane.showMessageDialog(
+                    null,
+                    "The file could not be loaded.",
+                    "Load Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+
             return null;
         }
     }
 }
-

@@ -1,117 +1,57 @@
 /**
+ * Handles saving RTF documents for the Basic Word Processor.
+ *
+ * Manages the currently open file, prompts the user for a save
+ * location when necessary, confirms file overwrites, and writes
+ * the JTextPane contents to an RTF file.
  *
  * @author seand
  */
 
-// imports Java library elements used by the class
-import javax.swing.JTextPane;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.JTextPane;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.text.BadLocationException;
 import javax.swing.text.StyledDocument;
 import javax.swing.text.rtf.RTFEditorKit;
 
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
-import java.io.File;
-import java.io.IOException;
+public class SaveFile {
 
-import javax.swing.text.BadLocationException;
+    // Stores the file currently associated with the open document.
+    private File currentFile;
 
-public class saveFile {
-
-    // Stores the file currently being worked on
-    private File currentFile = null;
-
-    public void setCurrentFile(File file){
+    /**
+     * Sets the file currently being edited.
+     *
+     * Used when an existing file is opened so subsequent saves
+     * update the same file rather than opening a new save dialog.
+     *
+     * @param file the currently open file
+     */
+    public void setCurrentFile(File file) {
         currentFile = file;
     }
 
-
+    /**
+     * Saves the current text document.
+     *
+     * If no file is currently associated with the document, the user
+     * is prompted to choose a save location. Existing files require
+     * overwrite confirmation before being replaced.
+     *
+     * @param text the JTextPane containing the document to save
+     * @return true if the document was saved successfully
+     */
     public boolean save(JTextPane text) {
 
-        // Checks if the text box is empty
-        if (text.getText().length() > 0) {
-
-            /*
-             * No current file means this is the first save,
-             * ask user to choose a file name/location.
-             */
-            if (currentFile == null) {
-
-                JFileChooser fileChooser = new JFileChooser();
-                fileChooser.setMultiSelectionEnabled(false);
-
-                FileNameExtensionFilter fileFilter =
-                        new FileNameExtensionFilter(
-                                "RICH TEXT FORMAT",
-                                "rtf"
-                        );
-
-                fileChooser.setFileFilter(fileFilter);
-
-                int option = fileChooser.showSaveDialog(null);
-
-                if (option == JFileChooser.APPROVE_OPTION) {
-
-                    File selectedFile = fileChooser.getSelectedFile();
-
-                    // Adds .rtf if user didn't enter it
-                    if (!selectedFile.getName().toLowerCase().endsWith(".rtf")) {
-                        selectedFile = new File(
-                                selectedFile.getAbsolutePath() + ".rtf"
-                        );
-                    }
-
-                    // Checks if file already exists
-                    if (selectedFile.exists()) {
-
-                        if (confirmOverwrite(selectedFile)) {
-
-                            currentFile = selectedFile;
-                            return writeFile(text);
-
-                        } else {
-
-                            // User chose not to overwrite
-                            return false;
-                        }
-
-                    } else {
-
-                        currentFile = selectedFile;
-                        return writeFile(text);
-                    }
-
-                } else {
-
-                    JOptionPane.showMessageDialog(
-                            null,
-                            "Text save cancelled.",
-                            "Save Cancelled",
-                            JOptionPane.INFORMATION_MESSAGE
-                    );
-
-                    return false;
-                }
-
-            } else {
-
-                /*
-                 * A current file already exists,
-                 * saving overwrites previous content.
-                 */
-                if (confirmOverwrite(currentFile)) {
-
-                    return writeFile(text);
-
-                } else {
-
-                    return false;
-                }
-            }
-
-        } else {
+        // Prevents saving an empty document.
+        if (text.getText().isEmpty()) {
 
             JOptionPane.showMessageDialog(
                     null,
@@ -122,9 +62,81 @@ public class saveFile {
 
             return false;
         }
+
+        /*
+         * If no file is currently associated with the document,
+         * prompt user to choose a filename and location.
+         */
+        if (currentFile == null) {
+            return chooseSaveLocation(text);
+        }
+
+        // Existing files require overwrite confirmation.
+        if (!confirmOverwrite(currentFile)) {
+            return false;
+        }
+
+        return writeFile(text);
     }
 
+    /**
+     * Displays a file chooser and selects the location for a new file.
+     *
+     * @param text the JTextPane containing the document to save
+     * @return true if the document was saved successfully
+     */
+    private boolean chooseSaveLocation(JTextPane text) {
 
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setMultiSelectionEnabled(false);
+
+        FileNameExtensionFilter fileFilter =
+                new FileNameExtensionFilter(
+                        "Rich Text Format (*.rtf)",
+                        "rtf"
+                );
+
+        fileChooser.setFileFilter(fileFilter);
+
+        int option = fileChooser.showSaveDialog(null);
+
+        if (option != JFileChooser.APPROVE_OPTION) {
+
+            JOptionPane.showMessageDialog(
+                    null,
+                    "File save cancelled.",
+                    "Save Cancelled",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return false;
+        }
+
+        File selectedFile = fileChooser.getSelectedFile();
+
+        // Automatically adds the .rtf extension.
+        if (!selectedFile.getName().toLowerCase().endsWith(".rtf")) {
+            selectedFile = new File(
+                    selectedFile.getAbsolutePath() + ".rtf"
+            );
+        }
+
+        // Warns before replacing an existing file.
+        if (selectedFile.exists() && !confirmOverwrite(selectedFile)) {
+            return false;
+        }
+
+        currentFile = selectedFile;
+
+        return writeFile(text);
+    }
+
+    /**
+     * Asks the user to confirm before overwriting an existing file.
+     *
+     * @param file the file that would be overwritten
+     * @return true when the user approves the overwrite
+     */
     private boolean confirmOverwrite(File file) {
 
         int choice = JOptionPane.showConfirmDialog(
@@ -139,18 +151,18 @@ public class saveFile {
         return choice == JOptionPane.YES_OPTION;
     }
 
-
-    /*
-     * Writes the JTextPane contents into the current file.
-     * Returns true if the save succeeds.
+    /**
+     * Writes the JTextPane document to the current RTF file.
+     *
+     * @param text the JTextPane containing the document
+     * @return true if the file was written successfully
      */
     private boolean writeFile(JTextPane text) {
 
         StyledDocument document =
                 (StyledDocument) text.getDocument();
 
-        RTFEditorKit editorKit =
-                new RTFEditorKit();
+        RTFEditorKit editorKit = new RTFEditorKit();
 
         try (
             BufferedOutputStream out =

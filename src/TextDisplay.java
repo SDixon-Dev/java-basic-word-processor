@@ -1,382 +1,428 @@
 /**
+ * Main GUI panel for the Basic Word Processor.
+ *
+ * Creates and arranges the editor controls, handles user interaction,
+ * tracks document changes, manages undo/redo, applies formatting,
+ * and coordinates file, clipboard and template functionality.
  *
  * @author seand
  */
 
-//imports java library elements used by the class
 import java.awt.Color;
 import java.awt.Dimension;
-
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
 
-import javax.swing.JPanel;
-import javax.swing.JTextPane;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.JTextPane;
+import javax.swing.SpinnerNumberModel;
 
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-import javax.swing.JSpinner;
-import javax.swing.SpinnerModel;
-import javax.swing.SpinnerNumberModel;
+import javax.swing.text.SimpleAttributeSet;
 
 import javax.swing.undo.UndoManager;
 
-import javax.swing.text.SimpleAttributeSet;
+public class TextDisplay extends JPanel implements ActionListener {
 
-import java.io.File;
-
-/*
- * JPanel extension enables typing and display on screen
- * ActionListener Implementation ensures button/combo box interaction & reaction
-*/
-
-public class TextDisplay extends JPanel implements ActionListener{ 
-    
-    //Attributes
-    private JTextPane textBox; 
-    private JButton saveButton; 
-    private JButton importButton;
-    private JComboBox fontTypeCombo;
-    private JSpinner textSize;
-    
+    // Main editor components
+    private JTextPane textBox;
     private JLabel characterCount;
-    
-    private boolean unsavedChanges = false;
-    private boolean boldActive = false;
-    private boolean italicActive = false;
-    private boolean underlineActive = false;
-    
-    private UndoManager undoManager;
-    
+
+    // File controls
+    private JButton saveButton;
+    private JButton importButton;
+
+    // Formatting controls
+    private JComboBox<String> fontTypeCombo;
+    private JSpinner textSize;
+    private JButton boldButton;
+    private JButton italicButton;
+    private JButton underlineButton;
+
+    // Editing controls
     private JButton copyButton;
     private JButton pasteButton;
     private JButton undoButton;
     private JButton redoButton;
-    private JComboBox textTemplate;
-    private JButton boldButton;
-    private JButton italicButton;
-    private JButton underlineButton;
-    
-    
-    //method objects so the classes can be called from withing this class
-    saveFile saveFile = new saveFile();
-    ImportFile loadFile = new ImportFile();
-    fontControl fontClass = new fontControl();
-    MainWordProcessor main = new MainWordProcessor();
-    Copy copyText = new Copy();
-    Paste pasteText = new Paste();
-    
-    /* Need 4 buttons for copy/paste & Undo/Redo
-    Need Template inserter combo box
-    */
-    
-    //arrays for the text combo boxes to extract data from
-    String[] fontItems = {"Times New Roman", "Arial", "Calibri"};
-    String[] Templates = {"No Template", "Letter", "Newspaper", "Resume"};
-    
-    
-    public TextDisplay(){ //when class TextDisplay called from main class, will go here  
-        init();
-        
+
+    // Template control
+    private JComboBox<String> textTemplate;
+
+    // Document state
+    private boolean unsavedChanges = false;
+    private boolean boldActive = false;
+    private boolean italicActive = false;
+    private boolean underlineActive = false;
+
+    private UndoManager undoManager;
+
+    // Supporting functionality
+    private final SaveFile saveFile = new SaveFile();
+    private final ImportFile loadFile = new ImportFile();
+    private final FontControl fontClass = new FontControl();
+    private final Copy copyText = new Copy();
+    private final Paste pasteText = new Paste();
+
+    // Available font and template options
+    private final String[] fontItems = {
+        "Times New Roman",
+        "Arial",
+        "Calibri"
+    };
+
+    private final String[] templates = {
+        "No Template",
+        "Letter",
+        "Newspaper",
+        "Resume"
+    };
+
+    public TextDisplay() {
+        initialiseComponents();
+        configureLayout();
+        registerListeners();
     }
-    
-    public void init(){ //Contains Buttons, constructs' components
-        
-        textBox = new JTextPane(); //area text typed is displayed
-        
-        undoManager = new UndoManager();
-        addUndoManager();
-        
+
+    //Creates Swing components used by the word processor.
+    private void initialiseComponents() {
+
+        textBox = new JTextPane();
+        textBox.setBackground(Color.WHITE);
+        textBox.setCaretColor(Color.BLACK);
+
         characterCount = new JLabel("Characters: 0");
-        
-        // Adds automatic character counting to the initial document
-        addCharacterCountListener();
-        
-        saveButton = new JButton ("Save File");  
-        importButton = new JButton ("Open File");
-        
-        fontTypeCombo = new JComboBox(fontItems); 
-        
-        SpinnerModel Value = new SpinnerNumberModel(10, 10, 72, 2);
-        textSize = new JSpinner(Value);
-        textSize.addChangeListener(e -> applyTextStyle());
-        
-        copyButton = new JButton ("Copy");
-        pasteButton = new JButton ("Paste");
-        undoButton = new JButton ("Undo");
-        redoButton = new JButton ("Redo");
+
+        saveButton = new JButton("Save File");
+        importButton = new JButton("Open File");
+
+        fontTypeCombo = new JComboBox<>(fontItems);
+
+        textSize = new JSpinner(
+                new SpinnerNumberModel(10, 10, 72, 2)
+        );
 
         boldButton = new JButton("Bold");
         italicButton = new JButton("Italic");
         underlineButton = new JButton("Underline");
-        
-        textTemplate = new JComboBox(Templates);
-       
-        textBox.setBackground(Color.WHITE);
-        textBox.setCaretColor(Color.BLACK);
 
-        
-        //Size & Layout
-        
-        setPreferredSize(new Dimension(817, 525)); 
+        copyButton = new JButton("Copy");
+        pasteButton = new JButton("Paste");
+        undoButton = new JButton("Undo");
+        redoButton = new JButton("Redo");
+
+        textTemplate = new JComboBox<>(templates);
+
+        undoManager = new UndoManager();
+
+        addUndoManager();
+        addCharacterCountListener();
+    }
+
+    //Adds & defines components' positions to the panel.
+    private void configureLayout() {
+
+        setPreferredSize(new Dimension(817, 525));
         setLayout(null);
-         
-        //adds components to the Frame
-        add (textBox);
-        add (saveButton);
-        add (importButton);
-        add (fontTypeCombo);
-        add (textSize);
-        
+
+        add(textBox);
+        add(textTemplate);
+        add(textSize);
+        add(fontTypeCombo);
+
         add(boldButton);
         add(italicButton);
         add(underlineButton);
-        
-        add (characterCount); 
-        
-        add (copyButton);
-        add (pasteButton);
-        add (undoButton);
-        add (redoButton);
-        
-        add (textTemplate);
-        
-        
-        //Sets the components' size and positions in the Displayed Frame  
-        textBox.setBounds(10, 10, 650, 500);
-        textTemplate.setBounds(670, 45, 140, 35); 
-        textSize.setBounds(670, 95, 140, 35);
 
+        add(importButton);
+        add(saveButton);
+
+        add(copyButton);
+        add(pasteButton);
+        add(undoButton);
+        add(redoButton);
+
+        add(characterCount);
+
+        textBox.setBounds(10, 10, 650, 500);
+
+        textTemplate.setBounds(670, 45, 140, 35);
+        textSize.setBounds(670, 95, 140, 35);
         fontTypeCombo.setBounds(670, 140, 140, 35);
 
-        // Formatting buttons
         boldButton.setBounds(670, 185, 65, 35);
         italicButton.setBounds(740, 185, 70, 35);
         underlineButton.setBounds(670, 230, 140, 35);
 
-        // File buttons
         importButton.setBounds(670, 275, 140, 35);
         saveButton.setBounds(670, 320, 140, 35);
 
-        // Editing buttons
         copyButton.setBounds(670, 365, 70, 35);
         pasteButton.setBounds(740, 365, 70, 35);
 
         undoButton.setBounds(670, 410, 70, 35);
         redoButton.setBounds(740, 410, 70, 35);
+
         characterCount.setBounds(670, 455, 140, 49);
-        
-        //Sets the Action Listeners for this particular class
+    }
+
+    //Registers listeners for all interactive controls.
+    private void registerListeners() {
+
         saveButton.addActionListener(this);
         importButton.addActionListener(this);
         fontTypeCombo.addActionListener(this);
+
         boldButton.addActionListener(this);
         italicButton.addActionListener(this);
         underlineButton.addActionListener(this);
-        
+
         copyButton.addActionListener(this);
         pasteButton.addActionListener(this);
         undoButton.addActionListener(this);
         redoButton.addActionListener(this);
-        textTemplate.addActionListener(this);
-    }
-    
-    //Method for the Action Listeners to enable component functionality
-    public void actionPerformed(ActionEvent e){
-        
-        //if statements call the relevant classes. Will contain the method's source code actions once the classes have been created and programmed.
-        if(e.getSource() == saveButton){
-            
-            boolean saved = saveFile.save(textBox);
-            
-            if (saved){
-                unsavedChanges = false;
-            }
-        }
-        
-        if(e.getSource() == importButton){
-            File loadedFile = loadFile.open(textBox);
-            
-            if(loadedFile != null){
-                
-                //Tells saveFile which file is open
-                saveFile.setCurrentFile(loadedFile);
-                
-                //Adds character counter to newly loaded doc
-                addCharacterCountListener();
-                updateCharacterCount();
-                
-                undoManager.discardAllEdits();
-                addUndoManager();
 
-            }
-        }
-        
-        if(e.getSource() == fontTypeCombo){
+        textTemplate.addActionListener(this);
+
+        textSize.addChangeListener(e -> applyTextStyle());
+    }
+
+    //Responses to button and combo-box actions.
+    @Override
+    public void actionPerformed(ActionEvent e) {
+
+        Object source = e.getSource();
+
+        if (source == saveButton) {
+            saveDocument();
+
+        } else if (source == importButton) {
+            openDocument();
+
+        } else if (source == fontTypeCombo) {
             applyTextStyle();
-        }
-        
-        if(e.getSource() == boldButton){
+
+        } else if (source == boldButton) {
             boldActive = !boldActive;
             applyTextStyle();
-        }
 
-        if(e.getSource() == italicButton){
+        } else if (source == italicButton) {
             italicActive = !italicActive;
             applyTextStyle();
-        }
 
-        if(e.getSource() == underlineButton){
+        } else if (source == underlineButton) {
             underlineActive = !underlineActive;
             applyTextStyle();
-        }
-        
-        
-        if(e.getSource() == copyButton){
+
+        } else if (source == copyButton) {
             copyText.copy(textBox);
-        }
-        
-        if(e.getSource() == pasteButton){
+
+        } else if (source == pasteButton) {
             pasteText.paste(textBox);
-        }
-        
-        if(e.getSource() == undoButton){
-            
-            if(undoManager.canUndo()){
-                undoManager.undo();
-            }
-        }
-        
-        if(e.getSource() == redoButton){
-            
-            if(undoManager.canRedo()){
-                undoManager.redo();
-            }
-        }
-        
-        
-        if(e.getSource() == textTemplate){
-            String selectedTemplate =
-                textTemplate.getSelectedItem().toString();
-             
-            if(selectedTemplate.equals("Letter")){
-                 
-                textBox.setText(
-                    "Dear Sir/Madam,\n\n"
-                    + "[Enter your letter here]\n\n"
-                    + "Yours Sincerely,\n"
-                    + "[Your Name]"
-                );
-            }
 
-            if(selectedTemplate.equals("Newspaper")){
+        } else if (source == undoButton) {
+            undo();
 
-                textBox.setText(
-                    "HEADLINE\n\n"
-                    + "By [Author Name]\n\n"
-                    + "[Opening paragraph]\n\n"
-                    + "[Main article content]"
-                );
-            }
+        } else if (source == redoButton) {
+            redo();
 
-            if(selectedTemplate.equals("Resume")){
-
-                textBox.setText(
-                    "FULL NAME\n\n"
-                    + "Contact Information\n"
-                    + "[Email Address]\n"
-                    + "[Phone Number]\n\n"
-                    + "Profile\n"
-                    + "[Professional profile]\n\n"
-                    + "Experience\n"
-                    + "[Work experience]\n\n"
-                    + "Education\n"
-                    + "[Education details]"
-                );
-            }
-
-            if(selectedTemplate.equals("No Template")){
-
-            // Does not insert anything
-            }
+        } else if (source == textTemplate) {
+            insertTemplate();
         }
     }
-    
-    //Adds a listener so the character counter auto updates when text changes.
-    private void addCharacterCountListener() {
 
-        textBox.getDocument().addDocumentListener(new DocumentListener() {
+    // Saves the current document.
+    private void saveDocument() {
 
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                updateCharacterCount();
-                unsavedChanges = true;
-            }
+        boolean saved = saveFile.save(textBox);
 
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                updateCharacterCount();
-                unsavedChanges = true;
-            }
+        if (saved) {
+            unsavedChanges = false;
+        }
+    }
 
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                updateCharacterCount();
-                unsavedChanges = true;
-            }
-        });
-    }   
-    
+   
+    //Opens an RTF document and resets document-specific listeners.
+    private void openDocument() {
+
+        File loadedFile = loadFile.open(textBox);
+
+        if (loadedFile == null) {
+            return;
+        }
+
+        saveFile.setCurrentFile(loadedFile);
+
+        addCharacterCountListener();
+        updateCharacterCount();
+
+        undoManager.discardAllEdits();
+        addUndoManager();
+
+        // A freshly loaded file has no unsaved user changes.
+        unsavedChanges = false;
+    }
+
+    /**
+     * Applies the selected font family, size and formatting
+     * to the currently selected text.
+     */
     private void applyTextStyle() {
+
+        int start = textBox.getSelectionStart();
+        int end = textBox.getSelectionEnd();
+
+        if (start == end) {
+            return;
+        }
+
         String fontFamily =
                 fontTypeCombo.getSelectedItem().toString();
 
         int size = (int) textSize.getValue();
 
         SimpleAttributeSet attributes =
-            fontClass.createStyle(
-                    fontFamily,
-                    size,
-                    boldActive,
-                    italicActive,
-                    underlineActive
-            );
+                fontClass.createStyle(
+                        fontFamily,
+                        size,
+                        boldActive,
+                        italicActive,
+                        underlineActive
+                );
 
-        int start = textBox.getSelectionStart();
-        int end = textBox.getSelectionEnd();
+        textBox.getStyledDocument().setCharacterAttributes(
+                start,
+                end - start,
+                attributes,
+                false
+        );
+    }
 
-        if (start != end) {
+    //Inserts the currently selected document template.
+    private void insertTemplate() {
 
-            textBox.getStyledDocument().setCharacterAttributes(
-                    start, end - start, attributes,
-                    false
-            );
+        String selectedTemplate =
+                textTemplate.getSelectedItem().toString();
+
+        switch (selectedTemplate) {
+
+            case "Letter":
+                textBox.setText(
+                        "Dear Sir/Madam,\n\n"
+                        + "[Enter your letter here]\n\n"
+                        + "Yours Sincerely,\n"
+                        + "[Your Name]"
+                );
+                break;
+
+            case "Newspaper":
+                textBox.setText(
+                        "HEADLINE\n\n"
+                        + "By [Author Name]\n\n"
+                        + "[Opening paragraph]\n\n"
+                        + "[Main article content]"
+                );
+                break;
+
+            case "Resume":
+                textBox.setText(
+                        "FULL NAME\n\n"
+                        + "Contact Information\n"
+                        + "[Email Address]\n"
+                        + "[Phone Number]\n\n"
+                        + "Profile\n"
+                        + "[Professional profile]\n\n"
+                        + "Experience\n"
+                        + "[Work experience]\n\n"
+                        + "Education\n"
+                        + "[Education details]"
+                );
+                break;
+
+            default:
+                // No Template selected, so no text is inserted.
+                break;
         }
     }
-    
-    //Calculates current character count & displays on GUI
-    private void updateCharacterCount(){
-        String text = textBox.getText();
-        characterCount.setText("Characters: " + text.length());
+
+    //Undoes the most recent editable action when possible.
+    private void undo() {
+
+        if (undoManager.canUndo()) {
+            undoManager.undo();
+        }
     }
-    
-    private void addUndoManager(){
-        textBox.getDocument().addUndoableEditListener(
-        e -> undoManager.addEdit(e.getEdit())
+
+    //Redoes the most recently undone action when possible.
+    private void redo() {
+
+        if (undoManager.canRedo()) {
+            undoManager.redo();
+        }
+    }
+
+    /**
+     * Adds a listener that updates the character count and
+     * records when the document has been modified.
+     */
+    private void addCharacterCountListener() {
+
+        textBox.getDocument().addDocumentListener(
+                new DocumentListener() {
+
+                    @Override
+                    public void insertUpdate(DocumentEvent e) {
+                        documentChanged();
+                    }
+
+                    @Override
+                    public void removeUpdate(DocumentEvent e) {
+                        documentChanged();
+                    }
+
+                    @Override
+                    public void changedUpdate(DocumentEvent e) {
+                        documentChanged();
+                    }
+                }
         );
     }
     
-    // Returns value of data in text box
-    public JTextPane getText(){
-        return textBox;
+    //Handles actions common to all document changes.
+    private void documentChanged() {
+        updateCharacterCount();
+        unsavedChanges = true;
     }
-    
-    public boolean hasUnsavedChanges(){
+
+   
+    //Updates the character count displayed in the GUI.
+    private void updateCharacterCount() {
+        characterCount.setText(
+                "Characters: " + textBox.getText().length()
+        );
+    }
+
+   
+    // Connects the current document to the UndoManager.
+    private void addUndoManager() {
+
+        textBox.getDocument().addUndoableEditListener(
+                e -> undoManager.addEdit(e.getEdit())
+        );
+    }
+
+    /**
+     * Returns whether the current document contains unsaved changes.
+     *
+     * @return true when unsaved changes exist
+     */
+    public boolean hasUnsavedChanges() {
         return unsavedChanges;
     }
-    
 }
